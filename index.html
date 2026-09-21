@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>حرکت‌شناسی</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+  body { background: #0d1117; color: #c9d1d9; min-height: 100vh; padding: 20px; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { text-align: center; color: #58a6ff; margin-bottom: 25px; font-size: 2rem; }
+  h2 { color: #58a6ff; margin: 0 0 15px; font-size: 1.2rem; border-bottom: 1px solid #21262d; padding-bottom: 8px; }
+  .card { background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .input-group { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 12px; }
+  .input-group label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; color: #8b949e; flex: 1; min-width: 120px; }
+  input[type="text"], input[type="number"] {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+    padding: 10px 12px; color: #c9d1d9; font-size: 1rem; direction: ltr; text-align: left; width: 100%;
+  }
+  input:focus { outline: none; border-color: #58a6ff; }
+  button {
+    background: #238636; color: #fff; border: none; border-radius: 8px;
+    padding: 10px 24px; font-size: 1rem; cursor: pointer; transition: background 0.2s; white-space: nowrap;
+  }
+  button:hover { background: #2ea043; }
+  .result-box {
+    background: #0d1117; border: 1px solid #21262d; border-radius: 8px;
+    padding: 15px; margin-top: 12px; line-height: 2;
+  }
+  .result-box .label { color: #8b949e; }
+  .result-box .value { color: #7ee787; font-weight: bold; direction: ltr; display: inline-block; }
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .chart-box { background: #0d1117; border: 1px solid #21262d; border-radius: 10px; padding: 10px; }
+  .chart-box h3 { text-align: center; color: #8b949e; font-size: 0.95rem; margin-bottom: 5px; font-weight: 400; }
+  canvas { width: 100% !important; height: 220px !important; display: block; }
+  .error { color: #f85149; font-size: 0.9rem; margin-top: 8px; min-height: 20px; }
+  .hint { color: #8b949e; font-size: 0.85rem; margin-bottom: 12px; line-height: 1.7; }
+  code { background: #21262d; padding: 2px 6px; border-radius: 4px; color: #f0883e; direction: ltr; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🚀 حرکت‌شناسی</h1>
+
+  <div class="card">
+    <h2>📐 معادله مکان - زمان</h2>
+    <p class="hint">
+      معادله را بر حسب <b>t</b> وارد کنید. مثال: <code>t^2 - 4*t + 3</code> یا <code>2*t^3 - 6*t^2 + 9*t</code><br>
+      عملگرها: <code>+ - * / ^</code> و پرانتز
+    </p>
+    <div class="input-group">
+      <label>
+        x(t) =
+        <input type="text" id="equationInput" value="t^2 - 4*t + 3">
+      </label>
+      <button id="analyzeBtn">تحلیل کن</button>
+    </div>
+    <div class="error" id="errorMsg"></div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <h2>📊 نتایج تحلیلی</h2>
+    <div class="result-box">
+      <div><span class="label">معادله مکان: </span><span class="value" id="eqPos"></span></div>
+      <div><span class="label">معادله سرعت: </span><span class="value" id="eqVel"></span></div>
+      <div><span class="label">معادله شتاب: </span><span class="value" id="eqAcc"></span></div>
+    </div>
+    <div class="result-box">
+      <div><span class="label">لحظه‌های تغییر جهت (v=0): </span><span class="value" id="turnPoints"></span></div>
+      <div><span class="label">لحظه‌های تغییر مکان (x=0): </span><span class="value" id="displacementPoints"></span></div>
+    </div>
+  </div>
+
+  <div class="card" id="chartsCard" style="display:none;">
+    <h2>📈 نمودارها</h2>
+    <div class="charts-grid">
+      <div class="chart-box">
+        <h3>نمودار مکان - زمان</h3>
+        <canvas id="posChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>نمودار سرعت - زمان</h3>
+        <canvas id="velChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>نمودار شتاب - زمان</h3>
+        <canvas id="accChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="instantCard" style="display:none;">
+    <h2>⏱️ محاسبات لحظه‌ای</h2>
+    <div class="input-group">
+      <label>
+        زمان t (ثانیه):
+        <input type="number" id="timeInput" value="1" step="0.1">
+      </label>
+      <button id="instantBtn">محاسبه</button>
+    </div>
+    <div class="result-box">
+      <div><span class="label">مکان: </span><span class="value" id="instPos">-</span></div>
+      <div><span class="label">سرعت: </span><span class="value" id="instVel">-</span></div>
+      <div><span class="label">تندی لحظه‌ای: </span><span class="value" id="instSpeed">-</span></div>
+      <div><span class="label">شتاب لحظه‌ای: </span><span class="value" id="instAcc">-</span></div>
+    </div>
+  </div>
+
+  <div class="card" id="intervalCard" style="display:none;">
+    <h2>📏 محاسبه در بازه زمانی</h2>
+    <div class="input-group">
+      <label>
+        زمان شروع t₁:
+        <input type="number" id="t1Input" value="0" step="0.1">
+      </label>
+      <label>
+        زمان پایان t₂:
+        <input type="number" id="t2Input" value="4" step="0.1">
+      </label>
+      <button id="intervalBtn">محاسبه</button>
+    </div>
+    <div class="result-box">
+      <div><span class="label">جابه‌جایی (Δx): </span><span class="value" id="dispResult">-</span></div>
+      <div><span class="label">مسافت طی شده: </span><span class="value" id="distResult">-</span></div>
+      <div><span class="label">سرعت متوسط: </span><span class="value" id="avgVelResult">-</span></div>
+      <div><span class="label">تندی متوسط: </span><span class="value" id="avgSpeedResult">-</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   مشتق‌گیر نمادین (Symbolic Differentiator)
+   پشتیبانی از: + - * / ^ ، اعداد، t، پرانتز
+   ============================================================ */
+
+// ---------- Lexer ----------
+function tokenize(str) {
+  const tokens = [];
+  let i = 0;
+  while (i < str.length) {
+    const c = str[i];
+
+    if (/\s/.test(c)) { i++; continue; }
+
+    if (/[0-9.]/.test(c)) {
+      let num = '';
+      while (i < str.length && /[0-9.]/.test(str[i])) num += str[i++];
+      tokens.push({ type: 'num', value: parseFloat(num) });
+      continue;
+    }
+
+    if (c === 't') {
+      tokens.push({ type: 'var' });
+      i++;
+      continue;
+    }
+
+    if ('+-*/^()'.includes(c)) {
+      tokens.push({ type: c });
+      i++;
+      continue;
+    }
+
+    throw new Error('کاراکتر نامعتبر: ' + c);
+  }
+  return tokens;
+}
+
+// ---------- Parser (Recursive Descent) ----------
+function parse(tokens) {
+  let pos = 0;
+
+  function peek() { return tokens[pos]; }
+  function next() { return tokens[pos++]; }
+  function expect(type) {
+    if (!peek() || peek().type !== type) {
+      throw new Error('انتظار ' + type + ' بود');
+    }
+    return next();
+  }
+
+  // expr := term (('+' | '-') term)*
+  function parseExpr() {
+    let left = parseTerm();
+    while (peek() && (peek().type === '+' || peek().type === '-')) {
+      const op = next().type;
+      const right = parseTerm();
+      left = { type: 'op', op, left, right };
+    }
+    return left;
+  }
+
+  // term := factor (('*' | '/') factor)*
+  function parseTerm() {
+    let left = parseFactor();
+    while (peek() && (peek().type === '*' || peek().type === '/')) {
+      const op = next().type;
+      const right = parseFactor();
+      left = { type: 'op', op, left, right };
+    }
+    return left;
+  }
+
+  // factor := unary ('^' factor)?   (راست-انجمنی)
+  function parseFactor() {
+    let base = parseUnary();
+    if (peek() && peek().type === '^') {
+      next();
+      const exp = parseFactor();
+      return { type: 'op', op: '^', left: base, right: exp };
+    }
+    return base;
+  }
+
+  // unary := ('-' | '+')? atom
+  function parseUnary() {
+    if (peek() && peek().type === '-') {
+      next();
+      const operand = parseUnary();
+      return { type: 'op', op: '*', left: { type: 'num', value: -1 }, right: operand };
+    }
+    if (peek() && peek().type === '+') {
+      next();
+      return parseUnary();
+    }
+    return parseAtom();
+  }
+
+  // atom := num | var | '(' expr ')'
+  function parseAtom() {
+    const tok = peek();
+    if (!tok) throw new Error('پایان غیرمنتظره معادله');
+
+    if (tok.type === 'num') {
+      next();
+      return { type: 'num', value: tok.value };
+    }
+    if (tok.type === 'var') {
+      next();
+      return { type: 'var' };
+    }
+    if (tok.type === '(') {
+      next();
+      const e = parseExpr();
+      expect(')');
+      return e;
+    }
+    throw new Error('توکن غیرمنتظره: ' + tok.type);
+  }
+
+  const ast = parseExpr();
+  if (pos < tokens.length) throw new Error('توکن اضافی در معادله');
+  return ast;
+}
+
+// ---------- مشتق‌گیری نمادین ----------
+function derivativeAST(node) {
+  switch (node.type) {
+    case 'num':
+      return { type: 'num', value: 0 };
+    case 'var':
+      return { type: 'num', value: 1 };
+    case 'op': {
+      const { op, left, right } = node;
+      const dl = derivativeAST(left);
+      const dr = derivativeAST(right);
+
+      if (op === '+') return { type: 'op', op: '+', left: dl, right: dr };
+      if (op === '-') return { type: 'op', op: '-', left: dl, right: dr };
+      if (op === '*') {
+        // (uv)' = u'v + uv'
+        return {
+          type: 'op', op: '+',
+          left: { type: 'op', op: '*', left: dl, right },
+          right: { type: 'op', op: '*', left, right: dr }
+        };
+      }
+      if (op === '/') {
+        // (u/v)' = (u'v - uv') / v^2
+        return {
+          type: 'op', op: '/',
+          left: {
+            type: 'op', op: '-',
+            left: { type: 'op', op: '*', left: dl, right },
+            right: { type: 'op', op: '*', left, right: dr }
+          },
+          right: { type: 'op', op: '^', left: right, right: { type: 'num', value: 2 } }
+        };
+      }
+      if (op === '^') {
+        // فقط حالت خاص: پایه = t ، توان = عدد ثابت
+        if (left.type === 'var' && right.type === 'num') {
+          const n = right.value;
+          return {
+            type: 'op', op: '*',
+            left: { type: 'num', value: n },
+            right: {
+              type: 'op', op: '^',
+              left: { type: 'var' },
+              right: { type: 'num', value: n - 1 }
+            }
+          };
+        }
+        // حالت خاص: پایه = عدد ثابت، توان = t  →  a^t * ln(a)
+        if (left.type === 'num' && right.type === 'var') {
+          // ما log نداریم در AST، اما مشتق عددی a^t * ln(a) کار می‌کند
+          // برای سادگی خطا می‌دهیم
+          throw new Error('مشتق a^t در این نسخه پشتیبانی نمی‌شود');
+        }
+        // حالت کلی: f^g ، فعلاً پشتیبانی نمی‌کنیم
+        throw new Error('مشتق توابع توانی پیچیده پشتیبانی نمی‌شود');
+      }
+      throw new Error('عملگر ناشناخته: ' + op);
+    }
+  }
+  throw new Error('گره ناشناخته: ' + node.type);
+}
+
+// ---------- ساده‌سازی AST ----------
+function simplify(node) {
+  if (!node) return node;
+
+  if (node.type === 'num' || node.type === 'var') return node;
+
+  if (node.type === 'op') {
+    const L = simplify(node.left);
+    const R = simplify(node.right);
+    const op = node.op;
+
+    // 0 + x = x
+    if (op === '+' && L.type === 'num' && L.value === 0) return R;
+    if (op === '+' && R.type === 'num' && R.value === 0) return L;
+
+    // x - 0 = x
+    if (op === '-' && R.type === 'num' && R.value === 0) return L;
+
+    // x * 0 = 0
+    if (op === '*' && ((L.type === 'num' && L.value === 0) || (R.type === 'num' && R.value === 0))) {
+      return { type: 'num', value: 0 };
+    }
+    // x * 1 = x
+    if (op === '*' && L.type === 'num' && L.value === 1) return R;
+    if (op === '*' && R.type === 'num' && R.value === 1) return L;
+
+    // x / 1 = x
+    if (op === '/' && R.type === 'num' && R.value === 1) return L;
+
+    // x^1 = x
+    if (op === '^' && R.type === 'num' && R.value === 1) return L;
+    // x^0 = 1
+    if (op === '^' && R.type === 'num' && R.value === 0) return { type: 'num', value: 1 };
+
+    // عدد با عدد
+    if (L.type === 'num' && R.type === 'num') {
+      let v;
+      switch (op) {
+        case '+': v = L.value + R.value; break;
+        case '-': v = L.value - R.value; break;
+        case '*': v = L.value * R.value; break;
+        case '/': v = L.value / R.value; break;
+        case '^': v = Math.pow(L.value, R.value); break;
+      }
+      return { type: 'num', value: v };
+    }
+
+    return { type: 'op', op, left: L, right: R };
+  }
+  return node;
+}
+
+// ---------- تبدیل AST به تابع اجرایی ----------
+function astToFunction(node) {
+  switch (node.type) {
+    case 'num': {
+      const v = node.value;
+      return () => v;
+    }
+    case 'var':
+      return (t) => t;
+    case 'op': {
+      const L = astToFunction(node.left);
+      const R = astToFunction(node.right);
+      switch (node.op) {
+        case '+': return (t) => L(t) + R(t);
+        case '-': return (t) => L(t) - R(t);
+        case '*': return (t) => L(t) * R(t);
+        case '/': return (t) => L(t) / R(t);
+        case '^': return (t) => Math.pow(L(t), R(t));
+      }
+    }
+  }
+  throw new Error('گره غیرقابل تبدیل');
+}
+
+// ---------- تبدیل AST به رشته ----------
+function astToString(node) {
+  if (node.type === 'num') {
+    return String(node.value);
+  }
+  if (node.type === 'var') return 't';
+  if (node.type === 'op') {
+    const L = astToString(node.left);
+    const R = astToString(node.right);
+    const { op } = node;
+
+    const needParenL = (node.left.type === 'op' &&
+      ((op === '*' && (node.left.op === '+' || node.left.op === '-')) ||
+       (op === '^' && node.left.op !== '^')));
+    const needParenR = (node.right.type === 'op' &&
+      ((op === '-' && (node.right.op === '+' || node.right.op === '-')) ||
+       (op === '/' ) ||
+       (op === '^' && node.right.op !== '^') ||
+       (op === '*' && (node.right.op === '+' || node.right.op === '-'))));
+
+    const ls = needParenL ? '(' + L + ')' : L;
+    const rs = needParenR ? '(' + R + ')' : R;
+
+    if (op === '^') return ls + '^' + rs;
+    return ls + ' ' + op + ' ' + rs;
+  }
+  return '';
+}
+
+/* ============================================================
+   توابع کمکی
+   ============================================================ */
+
+function findRoots(f, tMin, tMax, steps) {
+  steps = steps || 2000;
+  const roots = [];
+  const dt = (tMax - tMin) / steps;
+  let prevT = tMin;
+  let prevVal = f(prevT);
+
+  for (let i = 1; i <= steps; i++) {
+    const t = tMin + i * dt;
+    const val = f(t);
+
+    if (Math.abs(prevVal) < 1e-9) {
+      roots.push(+prevT.toFixed(3));
+    } else if (prevVal * val < 0) {
+      let a = prevT, b = t, fa = prevVal;
+      for (let j = 0; j < 60; j++) {
+        const mid = (a + b) / 2;
+        const fm = f(mid);
+        if (fa * fm <= 0) b = mid; else { a = mid; fa = fm; }
+      }
+      const root = (a + b) / 2;
+      if (!roots.some(r => Math.abs(r - root) < 0.01)) {
+        roots.push(+root.toFixed(3));
+      }
+    }
+    prevT = t;
+    prevVal = val;
+  }
+  return roots;
+}
+
+/* ============================================================
+   رسم نمودار
+   ============================================================ */
+
+function drawChart(canvasId, func, color, label, tMin, tMax) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width || 320;
+  const H = rect.height || 220;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const pad = { top: 20, right: 15, bottom: 25, left: 45 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  const N = 500;
+  const points = [];
+  let yMin = Infinity, yMax = -Infinity;
+
+  for (let i = 0; i <= N; i++) {
+    const t = tMin + (i / N) * (tMax - tMin);
+    let y;
+    try { y = func(t); } catch (e) { y = 0; }
+    if (!isFinite(y)) y = 0;
+    points.push({ t, y });
+    if (y < yMin) yMin = y;
+    if (y > yMax) yMax = y;
+  }
+
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  const yr = yMax - yMin;
+  yMin -= yr * 0.1;
+  yMax += yr * 0.1;
+
+  const toX = t => pad.left + ((t - tMin) / (tMax - tMin)) * plotW;
+  const toY = y => pad.top + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
+
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  // شبکه
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 1;
+  ctx.font = '10px monospace';
+  ctx.fillStyle = '#8b949e';
+
+  for (let i = 0; i <= 4; i++) {
+    const y = yMin + (i / 4) * (yMax - yMin);
+    const py = toY(y);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, py);
+    ctx.lineTo(W - pad.right, py);
+    ctx.stroke();
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(y.toFixed(1), pad.left - 5, py);
+  }
+
+  for (let i = 0; i <= 5; i++) {
+    const t = tMin + (i / 5) * (tMax - tMin);
+    const px = toX(t);
+    ctx.beginPath();
+    ctx.moveTo(px, pad.top);
+    ctx.lineTo(px, H - pad.bottom);
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(t.toFixed(1), px, H - pad.bottom + 5);
+  }
+
+  // محورها
+  ctx.strokeStyle = '#484f58';
+  ctx.lineWidth = 1.5;
+  if (yMin <= 0 && yMax >= 0) {
+    const y0 = toY(0);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y0);
+    ctx.lineTo(W - pad.right, y0);
+    ctx.stroke();
+  }
+  if (tMin <= 0 && tMax >= 0) {
+    const x0 = toX(0);
+    ctx.beginPath();
+    ctx.moveTo(x0, pad.top);
+    ctx.lineTo(x0, H - pad.bottom);
+    ctx.stroke();
+  }
+
+  // منحنی
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i++) {
+    const px = toX(points[i].t);
+    const py = toY(points[i].y);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(label, pad.left + 5, pad.top + 3);
+}
+
+/* ============================================================
+   متغیرهای سراسری
+   ============================================================ */
+
+let posFunc = null;
+let velFunc = null;
+let accFunc = null;
+
+/* ============================================================
+   تحلیل اصلی
+   ============================================================ */
+
+function analyze() {
+  const expr = document.getElementById('equationInput').value.trim();
+  const errorEl = document.getElementById('errorMsg');
+  errorEl.textContent = '';
+
+  if (!expr) {
+    errorEl.textContent = 'معادله را وارد کنید.';
+    return;
+  }
+
+  let ast, dAst, ddAst;
+
+  try {
+    const tokens = tokenize(expr);
+    ast = parse(tokens);
+    dAst = simplify(derivativeAST(ast));       // مشتق اول (سرعت)
+    ddAst = simplify(derivativeAST(dAst));    // مشتق دوم (شتاب)
+  } catch (e) {
+    errorEl.textContent = '❌ ' + e.message;
+    return;
+  }
+
+  // ساخت توابع اجرایی
+  posFunc = astToFunction(ast);
+  velFunc = astToFunction(dAst);
+  accFunc = astToFunction(ddAst);
+
+  // نمایش کارت‌ها
+  ['resultsCard', 'chartsCard', 'instantCard', 'intervalCard'].forEach(id => {
+    document.getElementById(id).style.display = 'block';
+  });
+
+  // نمایش معادلات
+  document.getElementById('eqPos').textContent = 'x(t) = ' + astToString(ast);
+  document.getElementById('eqVel').textContent = 'v(t) = ' + astToString(dAst);
+  document.getElementById('eqAcc').textContent = 'a(t) = ' + astToString(ddAst);
+
+  // ریشه‌ها
+  const turnRoots = findRoots(velFunc, -10, 10, 2000);
+  const dispRoots = findRoots(posFunc, -10, 10, 2000);
+
+  document.getElementById('turnPoints').textContent =
+    turnRoots.length ? turnRoots.map(r => 't=' + r).join(' , ') : 'ندارد';
+  document.getElementById('displacementPoints').textContent =
+    dispRoots.length ? dispRoots.map(r => 't=' + r).join(' , ') : 'ندارد';
+
+  // رسم نمودارها
+  drawChart('posChart', posFunc, '#58a6ff', 'x(t)', -5, 5);
+  drawChart('velChart', velFunc, '#7ee787', 'v(t)', -5, 5);
+  drawChart('accChart', accFunc, '#f0883e', 'a(t)', -5, 5);
+
+  calcInstant();
+  calcInterval();
+}
+
+/* ============================================================
+   محاسبات لحظه‌ای
+   ============================================================ */
+
+function calcInstant() {
+  if (!posFunc) return;
+  const t = parseFloat(document.getElementById('timeInput').value);
+  if (isNaN(t)) return;
+
+  const x = posFunc(t);
+  const v = velFunc(t);
+  const a = accFunc(t);
+
+  document.getElementById('instPos').textContent = x.toFixed(4) + ' m';
+  document.getElementById('instVel').textContent = v.toFixed(4) + ' m/s';
+  document.getElementById('instSpeed').textContent = Math.abs(v).toFixed(4) + ' m/s';
+  document.getElementById('instAcc').textContent = a.toFixed(4) + ' m/s²';
+}
+
+/* ============================================================
+   محاسبات بازه
+   ============================================================ */
+
+function calcInterval() {
+  if (!posFunc) return;
+
+  const t1 = parseFloat(document.getElementById('t1Input').value);
+  const t2 = parseFloat(document.getElementById('t2Input').value);
+
+  if (isNaN(t1) || isNaN(t2) || t2 <= t1) {
+    document.getElementById('dispResult').textContent = 'بازه نامعتبر';
+    document.getElementById('distResult').textContent = 'بازه نامعتبر';
+    document.getElementById('avgVelResult').textContent = '-';
+    document.getElementById('avgSpeedResult').textContent = '-';
+    return;
+  }
+
+  const x1 = posFunc(t1);
+  const x2 = posFunc(t2);
+  const displacement = x2 - x1;
+
+  const roots = findRoots(velFunc, t1, t2, 1000);
+  const critPoints = [t1, ...roots, t2].sort((a, b) => a - b);
+
+  let distance = 0;
+  for (let i = 0; i < critPoints.length - 1; i++) {
+    const a = critPoints[i];
+    const b = critPoints[i + 1];
+    if (b - a < 1e-9) continue;
+    distance += Math.abs(posFunc(b) - posFunc(a));
+  }
+
+  const dt = t2 - t1;
+  document.getElementById('dispResult').textContent = displacement.toFixed(4) + ' m';
+  document.getElementById('distResult').textContent = distance.toFixed(4) + ' m';
+  document.getElementById('avgVelResult').textContent = (displacement / dt).toFixed(4) + ' m/s';
+  document.getElementById('avgSpeedResult').textContent = (distance / dt).toFixed(4) + ' m/s';
+}
+
+/* ============================================================
+   رویدادها
+   ============================================================ */
+
+document.getElementById('analyzeBtn').addEventListener('click', analyze);
+document.getElementById('equationInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') analyze();
+});
+document.getElementById('instantBtn').addEventListener('click', calcInstant);
+document.getElementById('timeInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') calcInstant();
+});
+document.getElementById('intervalBtn').addEventListener('click', calcInterval);
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (posFunc) {
+      drawChart('posChart', posFunc, '#58a6ff', 'x(t)', -5, 5);
+      drawChart('velChart', velFunc, '#7ee787', 'v(t)', -5, 5);
+      drawChart('accChart', accFunc, '#f0883e', 'a(t)', -5, 5);
+    }
+  }, 200);
+});
+
+window.addEventListener('load', () => {
+  setTimeout(analyze, 100);
+});
+</script>
+</body>
+</html>
